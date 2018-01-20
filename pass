@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+PASS_REPO=$HOME/.pass
+
+list() {
+    for site in $PASS_REPO/*
+    do
+        for user in $site/*
+        do
+            echo ${user#$PASS_REPO/}
+        done
+    done
+}
+
+show() {
+    site=$1
+    user=${2:-default}
+    gpg -q -d -r $USER $PASS_REPO/$site/$user
+}
+
+store() {
+    site=$1
+    user=${2:-default}
+    if [ -f "$PASS_REPO/$site/$user" ] ; then
+        echo -n "Overwrite existing password(N/y): "
+        read answer
+        answer=${answer:-n}
+        if [ "$answer" == "n" -o "$answer" == "N" ] ; then
+            return
+        fi
+    fi
+
+    while true
+    do
+        echo -n "Enter password:"
+        read -s password1
+        echo
+        echo -n "Enter password again:"
+        read -s password2
+        echo
+        if [ "$password1" == "$password2" ]; then
+            mkdir -p $PASS_REPO/$site
+            echo $password1 | gpg -q -e -r $USER > $PASS_REPO/$site/$user
+            break
+        fi
+    done
+}
+
+usage() {
+    cat <<EOF
+pass <list|store[|show]> <site[/user]>
+EOF
+}
+
+if [ $# -lt 1 -o $# -gt 2 ]; then
+    usage
+    exit 1
+fi
+
+action=$1
+site=$2
+user=default
+
+if echo $site | grep '/' >/dev/null ; then
+    site=$(echo $site | cut -d'/' -f1)
+    user=$(echo $site | cut -d'/' -f2)
+fi
+
+mkdir -p $PASS_REPO
+
+if [ "$action" == "list" ]; then
+    list
+elif [ "$action" == "store" ]; then
+    store $site $user
+elif [ "$action" == "show" ]; then
+    show $site $user
+elif [ -d "$PASS_REPO/$action" ]; then
+    show $action
+else
+    usage
+    exit 1
+fi
